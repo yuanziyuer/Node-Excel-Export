@@ -1,5 +1,5 @@
 var express = require('express');
-var nodeExcel = require('excel-export');
+var nodeExcel = require('excel-export-fast');
 var app = express();
 
 app.get('/Excel', function(req, res){
@@ -49,10 +49,17 @@ app.get('/Excel', function(req, res){
       ["M&M<>'", new Date(Date.UTC(2013, 6, 9)), false, 1.61803],
       ["null date", null, true, 1.414]
     ];
-  var result = nodeExcel.execute(conf);
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats');
-  res.setHeader("Content-Disposition", "attachment; filename=" + "Report.xlsx");
-  res.end(result, 'binary');
+  return nodeExcel.execute(conf, function(err, result) {
+    if (err) {
+      console.log("ERROR!", err)
+      res.end('ERROR')
+      return;
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats');
+    res.setHeader("Content-Disposition", "attachment; filename=" + "Report.xlsx");
+    res.end(result, 'binary');
+  })
 });
 
 app.listen(3000);

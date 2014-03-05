@@ -20,9 +20,10 @@ describe('Simple Excel xlsx Export', function() {
         ["null", null, null, null]
 			];
 			
-            var result = nodeExcel.execute(conf);
-			var fs = require('fs');
-			fs.writeFileSync('d.xlsx', result, 'binary');			
+            nodeExcel.execute(conf, function(err, result) {
+		var fs = require('fs');
+		fs.writeFileSync('d.xlsx', result, 'binary');			
+	    });
         });
     });
 });

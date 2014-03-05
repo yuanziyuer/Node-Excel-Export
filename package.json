@@ -1,20 +1,25 @@
 {
-  "name": "excel-export",
-  "version": "0.3.11",
-  "description": "Simple data set export to Excel xlsx file",
+  "name": "excel-export-fast",
+  "version": "0.4.0",
+  "description": "Simple and fast data set export to Excel xlsx file",
   "main": "index.js",
   "scripts": {
     "test": "mocha test/main"
   },
-  "repository": "https://github.com/functionscope/Node-Excel-Export",
+  "repository": "https://github.com/elwerene/Node-Excel-Export",
   "keywords": [
     "Excel",
     "xlsx"
   ],
-  "author": "Ber-Lin Lai <berlin.lai@gmail.com>",
+  "contributors": [
+    "Ber-Lin Lai <berlin.lai@gmail.com>",
+    "René Rössler <rene@freshx.de>"
+  ],
   "license": "BSD",
   "dependencies":{
-	 "node-zip":"1.x"  
+    "temp": "~0.5.1",
+    "zipper": "^0.3.0",
+    "async": "^0.2.10"
   },
   "devDependencies": {
      "mocha": "",
