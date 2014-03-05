@@ -1,5 +1,5 @@
 var fs = require('fs');
-var temp = require('temp');
+var temp = require('temp').track();
 var path = require('path');
 var zipper = require('zipper').Zipper;
 var async = require('async');
