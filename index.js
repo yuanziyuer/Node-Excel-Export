@@ -124,8 +124,8 @@ exports.execute = function(config, callback) {
         function(callback) {
             return async.eachSeries(cols, function(col, callback) {
                 var colStyleIndex = col.captionStyleIndex || 0;
-                var res = addStringCol(getColumnLetter(k+1)+1, col.caption, colStyleIndex, shareStrings, convertedShareStrings);
-                convertedShareStrings = res[1];
+                var res = addStringCol(getColumnLetter(k+1)+1, col.caption, colStyleIndex, shareStrings);
+                convertedShareStrings += res[1];
                 return write(res[0], callback);
             }, callback);
         },
@@ -178,7 +178,7 @@ exports.execute = function(config, callback) {
                             default:
                                 var res = addStringCol(getColumnLetter(j+1)+currRow, cellData, styleIndex, shareStrings, convertedShareStrings);
                                 row += res[0]
-                                convertedShareStrings = res[1]
+                                convertedShareStrings += res[1]
                         }
                     }       
 
@@ -282,20 +282,21 @@ var addBoolCol = function(cellRef, value, styleIndex){
     return '<x:c r="'+cellRef+'" s="'+ styleIndex + '" t="b"><x:v>'+value+'</x:v></x:c>';
 }
 
-var addStringCol = function(cellRef, value, styleIndex, shareStrings, convertedShareStrings){
+var addStringCol = function(cellRef, value, styleIndex, shareStrings){
     styleIndex = styleIndex || 0;
     if (value===null) {
-        return "";
+        return ["", ""];
     }
 
     if (typeof value ==='string') {
         value = value.replace(/&/g, "&amp;").replace(/'/g, "&apos;").replace(/>/g, "&gt;").replace(/</g, "&lt;");
     }
 
+    var convertedShareStrings = ""
     var i = shareStrings.indexOf(value);
     if ( i< 0) {
         i = shareStrings.push(value) -1;
-        convertedShareStrings = convertedShareStrings+ "<x:si><x:t>"+value+"</x:t></x:si>";
+        convertedShareStrings = "<x:si><x:t>"+value+"</x:t></x:si>";
     }
 
     return ['<x:c r="'+cellRef+'" s="'+ styleIndex + '" t="s"><x:v>'+i+'</x:v></x:c>', convertedShareStrings];
