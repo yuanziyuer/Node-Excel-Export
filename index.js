@@ -19,7 +19,6 @@ var sheetBack = '</x:sheetData><x:printOptions horizontalCentered="0" verticalCe
 
 var sharedStringsFront = '<?xml version="1.0" encoding="UTF-8"?><x:sst xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uniqueCount="$count" count="$count">';
 var sharedStringsBack = '</x:sst>';
-var shareStrings, convertedShareStrings;
 
 exports.execute = function(config, callback) {
     var cols = config.cols,
@@ -28,132 +27,208 @@ exports.execute = function(config, callback) {
         p,
         files = [],
         styleIndex,
-        k;
+        k,
+        dirPath,
+        shareStrings = [],
+        convertedShareStrings = "",
+        sheet,
+        sheetPos = 0;
 
-    return temp.mkdir('xlsx', function(err, dirPath) {
-        if (err) {
-            return callback(err);
-        }
+    var write = function(str, callback) {
+        var buf = new Buffer(str)
+        var off = 0;
+        var written = 0;
 
-        fs.mkdirSync(path.join(dirPath, 'xl'))
-        fs.mkdirSync(path.join(dirPath, 'xl', 'worksheets'))
-        fs.writeFileSync(path.join(dirPath, 'data.zip'), templateXLSX);
+        return async.whilst(
+            function() {
+                return written < buf.length;
+            },
+            function(callback) {
+                fs.write(sheet, buf, off, buf.length - off, sheetPos, function(err, w) {
+                    if (err) {
+                        return callback(err);
+                    }
 
+                    written += w;
+                    off += w;
+                    sheetPos += w;
 
-        if (config.stylesXmlFile){
-            p = config.stylesXmlFile;
-            var styles = null;
-            styles = fs.readFileSync(p, 'utf8');
-            if (styles){
-                p = path.join(dirPath, 'xl', 'styles.xml');
-                fs.writeFileSync(p, styles);
-                files.push(p);
-            }
-        }
-  
-        shareStrings = [];
-        convertedShareStrings = "";
+                    return callback();
+                });
+            },
+            callback
+        );
+    }
 
-        p = path.join(dirPath, 'xl', 'worksheets', 'sheet.xml');
-        var sheet = fs.openSync(p, 'a+');
-        files.push(p);
-
-        var sheetPos = 0
-        var write = function(str) {
-            var buf = new Buffer(str)
-            var off = 0;
-            var written = 0;
-
-            while (written < buf.length) {
-                var w = fs.writeSync(sheet, buf, off, buf.length - off, sheetPos)
-                off += w;
-                sheetPos += w;
-                written += w;
-            }
-        }
-
-        write(sheetFront);
-
-        //first row for column caption
-        var colStyleIndex;
-        write('<x:row r="1" spans="1:'+ colsLength + '">');
-        for (k=0; k < colsLength; k++) {
-            colStyleIndex = cols[k].captionStyleIndex || 0;
-            write(addStringCol(getColumnLetter(k+1)+1, cols[k].caption, colStyleIndex));
-        }
-        write('</x:row>');
-        
-        //fill in data
-        var j, r, cellData, currRow, cellType;
-        var i = -1;
-
-        while(data.length > 0) {
-            i++
-            r = data.pop()
-            currRow = i+2;
-
-            write('<x:row r="' + currRow +'" spans="1:'+ colsLength + '">');
-
-            for (j=0; j < colsLength; j++) {
-                styleIndex = null;
-                cellData = r[j];
-                cellType = cols[j].type;
-
-                if (typeof cols[j].beforeCellWrite === 'function') {
-                    var e = {
-                      rowNum: currRow,
-                      styleIndex: null,
-                      cellType: cellType
-                    };
-
-                    cellData = cols[j].beforeCellWrite(r, cellData, e);
-                    styleIndex = e.styleIndex || styleIndex;
-                    cellType = e.cellType;
-                    e = undefined;
-                }     
-
-                switch (cellType) {
-                    case 'number':
-                        write(addNumberCol(getColumnLetter(j+1)+currRow, cellData, styleIndex));
-                        break;
-                    case 'date':
-                        write(addDateCol(getColumnLetter(j+1)+currRow, cellData, styleIndex));
-                        break;
-                    case 'bool':
-                        write(addBoolCol(getColumnLetter(j+1)+currRow, cellData, styleIndex));
-                        break;                                  
-                    default:
-                        write(addStringCol(getColumnLetter(j+1)+currRow, cellData, styleIndex));
+    return async.waterfall([
+        function(callback) {
+            return temp.mkdir('xlsx', function(err, dir) {
+                if (err) {
+                    return callback(err);
                 }
-            }       
 
-            write('</x:row>');
-        }
+                dirPath = dir;
+                return callback();
+            });
+        },
+        function(callback) {
+            return fs.mkdir(path.join(dirPath, 'xl'), callback);
+        },
+        function(callback) {
+            return fs.mkdir(path.join(dirPath, 'xl', 'worksheets'), callback);
+        },
+        function(callback) {
+            return async.parallel([
+                function(callback) {
+                    return fs.writeFile(path.join(dirPath, 'data.zip'), templateXLSX, callback);
+                },
+                function(callback) {
+                    if (!config.stylesXmlFile) {
+                        return callback();
+                    }
 
-        write(sheetBack)
-        fs.closeSync(sheet)
+                    p = config.stylesXmlFile;
+                    return fs.readFile(p, 'utf8', function(err, styles) {
+                        if (err) {
+                            return callback(err);
+                        }
 
-        if (shareStrings.length >0) {
+                        p = path.join(dirPath, 'xl', 'styles.xml');
+                        files.push(p);
+                        return fs.writeFile(p, styles, callback);
+                    });
+                }
+            ], function(err) {
+                return callback(err);
+            })
+        },
+        function(callback) {
+            p = path.join(dirPath, 'xl', 'worksheets', 'sheet.xml');
+            files.push(p);
+            return fs.open(p, 'a+', function(err, fd) {
+                if (err) {
+                    return callback(err);
+                }
+
+                sheet = fd;
+
+                return callback();
+            });
+        },
+        function(callback) {
+            return write(sheetFront, callback);
+        },
+        function(callback) {
+            return write('<x:row r="1" spans="1:'+ colsLength + '">', callback);
+        },
+        function(callback) {
+            return async.eachSeries(cols, function(col, callback) {
+                var colStyleIndex = col.captionStyleIndex || 0;
+                var res = addStringCol(getColumnLetter(k+1)+1, col.caption, colStyleIndex, shareStrings, convertedShareStrings);
+                convertedShareStrings = res[1];
+                return write(res[0], callback);
+            }, callback);
+        },
+        function(callback) {
+            return write('</x:row>', callback);
+        },
+        function(callback) {
+            var j, r, cellData, currRow, cellType;
+            var i = -1;
+
+            return async.whilst(
+                function() {
+                    return data.length > 0;
+                },
+                function(callback) {
+                    i++
+                    r = data.pop()
+                    currRow = i+2;
+
+                    var row = '<x:row r="' + currRow +'" spans="1:'+ colsLength + '">';
+
+                    for (j=0; j < colsLength; j++) {
+                        styleIndex = null;
+                        cellData = r[j];
+                        cellType = cols[j].type;
+
+                        if (typeof cols[j].beforeCellWrite === 'function') {
+                            var e = {
+                                rowNum: currRow,
+                                styleIndex: null,
+                                cellType: cellType
+                            };
+
+                            cellData = cols[j].beforeCellWrite(r, cellData, e);
+                            styleIndex = e.styleIndex || styleIndex;
+                            cellType = e.cellType;
+                            e = undefined;
+                        }     
+
+                        switch (cellType) {
+                            case 'number':
+                                row += addNumberCol(getColumnLetter(j+1)+currRow, cellData, styleIndex);
+                                break;
+                            case 'date':
+                                row += addDateCol(getColumnLetter(j+1)+currRow, cellData, styleIndex);
+                                break;
+                            case 'bool':
+                                row += addBoolCol(getColumnLetter(j+1)+currRow, cellData, styleIndex);
+                                break;                                  
+                            default:
+                                var res = addStringCol(getColumnLetter(j+1)+currRow, cellData, styleIndex, shareStrings, convertedShareStrings);
+                                row += res[0]
+                                convertedShareStrings = res[1]
+                        }
+                    }       
+
+                    row += '</x:row>';
+
+                    return write(row, callback);
+                },
+                callback
+            );
+        },
+        function(callback) {
+            return write(sheetBack, callback);
+        },
+        function(callback) {
+            return fs.close(sheet, callback);
+        },
+        function(callback) {
+            if (shareStrings.length === 0) {
+                return callback();
+            }
+
             sharedStringsFront = sharedStringsFront.replace(/\$count/g, shareStrings.length);
             p = path.join(dirPath, 'xl', 'sharedStrings.xml');
-            fs.writeFileSync(p, sharedStringsFront + convertedShareStrings + sharedStringsBack);
             files.push(p)
-        }
-        shareStrings = undefined;
+            return fs.writeFile(p, sharedStringsFront + convertedShareStrings + sharedStringsBack, callback);
+        },
+        function(callback) {
+            var zipfile = new zipper(path.join(dirPath, 'data.zip'));
 
-        var zipfile = new zipper(path.join(dirPath, 'data.zip'));
-        return async.eachSeries(files, function(file, callback) {
-            var relative = path.relative(dirPath, file)
+            return async.eachSeries(files, function(file, callback) {
+                var relative = path.relative(dirPath, file)
 
-            return zipfile.addFile(file, relative, callback);
-        }, function(err, res) {
+                return zipfile.addFile(file, relative, callback);
+            }, function(err, res) {
+                if (err) {
+                    return callback(err);
+                }
+
+                return fs.readFile(path.join(dirPath, 'data.zip'), callback);
+            })
+        }],
+        function(err, data) {
             if (err) {
                 return callback(err);
             }
 
-            return fs.readFile(path.join(dirPath, 'data.zip'), callback);
-        })
-    })
+            temp.cleanup();
+            return callback(null, data);
+        }
+    );
 }
 
 var startTag = function (obj, tagName, closed) {
@@ -207,7 +282,7 @@ var addBoolCol = function(cellRef, value, styleIndex){
     return '<x:c r="'+cellRef+'" s="'+ styleIndex + '" t="b"><x:v>'+value+'</x:v></x:c>';
 }
 
-var addStringCol = function(cellRef, value, styleIndex){
+var addStringCol = function(cellRef, value, styleIndex, shareStrings, convertedShareStrings){
     styleIndex = styleIndex || 0;
     if (value===null) {
         return "";
@@ -223,7 +298,7 @@ var addStringCol = function(cellRef, value, styleIndex){
         convertedShareStrings = convertedShareStrings+ "<x:si><x:t>"+value+"</x:t></x:si>";
     }
 
-    return '<x:c r="'+cellRef+'" s="'+ styleIndex + '" t="s"><x:v>'+i+'</x:v></x:c>';
+    return ['<x:c r="'+cellRef+'" s="'+ styleIndex + '" t="s"><x:v>'+i+'</x:v></x:c>', convertedShareStrings];
 }
 
 var getColumnLetter = function(col){
