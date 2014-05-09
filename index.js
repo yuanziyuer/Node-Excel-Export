@@ -136,6 +136,8 @@ exports.execute = function(config, callback) {
             var j, r, cellData, currRow, cellType;
             var i = -1;
 
+            data.reverse()
+
             return async.whilst(
                 function() {
                     return data.length > 0;
