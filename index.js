@@ -83,11 +83,8 @@ exports.execute = function(config, callback) {
                     return fs.writeFile(path.join(dirPath, 'data.zip'), templateXLSX, callback);
                 },
                 function(callback) {
-                    if (!config.stylesXmlFile) {
-                        return callback();
-                    }
 
-                    p = config.stylesXmlFile;
+                    p = config.stylesXmlFile || __dirname + '/styles.xml';
                     return fs.readFile(p, 'utf8', function(err, styles) {
                         if (err) {
                             return callback(err);
