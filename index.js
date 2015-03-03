@@ -1,7 +1,7 @@
 var fs = require('fs');
 var temp = require('temp').track();
 var path = require('path');
-var zipper = require('zipper').Zipper;
+var AdmZip = require('adm-zip');
 var async = require('async');
 
 Date.prototype.getJulian = function() {
@@ -205,18 +205,16 @@ exports.execute = function(config, callback) {
             return fs.writeFile(p, sharedStringsFront + convertedShareStrings + sharedStringsBack, callback);
         },
         function(callback) {
-            var zipfile = new zipper(path.join(dirPath, 'data.zip'));
-
+	        var zip = new AdmZip();
             return async.eachSeries(files, function(file, callback) {
                 var relative = path.relative(dirPath, file)
-
-                return zipfile.addFile(file, relative, callback);
+                zip.addLocalFile(relative,"/",file);
+	            return callback();
             }, function(err, res) {
                 if (err) {
                     return callback(err);
                 }
-
-                return fs.readFile(path.join(dirPath, 'data.zip'), callback);
+                return  zip.writeZip(path.join(dirPath, 'data.zip'),callback);
             })
         }],
         function(err, data) {

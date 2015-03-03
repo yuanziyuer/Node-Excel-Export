@@ -6,7 +6,7 @@
   "scripts": {
     "test": "mocha test/main"
   },
-  "repository": "https://github.com/elwerene/Node-Excel-Export",
+  "repository": "https://github.com/yuanziyuer/Node-Excel-Export",
   "keywords": [
     "Excel",
     "xlsx"
@@ -18,7 +18,7 @@
   "license": "BSD",
   "dependencies":{
     "temp": "~0.7.0",
-    "zipper": "^0.3.0",
+    "adm-zip": "~0.4.7",
     "async": "^0.2.10"
   },
   "devDependencies": {
